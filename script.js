@@ -44,19 +44,11 @@ function loadImage(src) {
 // ELEMENT DEFAULTS
 const DEFAULTS = {
   camera:    { img:'./images/camera.svg', label:'Cam', color:'#4a9eff', size:36 },
-  tripod:    { emoji:'🎬', label:'', color:'#4a9eff', size:36 },
-  monitor:   { emoji:'🖥', label:'', color:'#4a9eff', size:36 },
   light:     { emoji:'💡', label:'Lumière', color:'#ffcc44', size:36 },
   reflector: { emoji:'🔆', label:'', color:'#ffcc44', size:36 },
   micro:     { emoji:'🎙', label:'', color:'#ffcc44', size:36 },
   person:    { img:'./images/people.svg', label:'P1', color:'#ff6b6b', size:36 },
-  chair:     { emoji:'🪑', label:'', color:'#7bed9f', size:32 },
   table:     { emoji:'', label:'TABLE', color:'#7bed9f', size:48, shape:'rect' },
-  door:      { emoji:'🚪', label:'', color:'#aaa', size:36 },
-  window:    { emoji:'🪟', label:'', color:'#aaa', size:36 },
-  wall:      { emoji:'', label:'MUR', color:'#555', size:48, shape:'rect' },
-  arrow:     { emoji:'➡️', label:'', color:'#fff', size:40 },
-  text:      { emoji:'', label:'Annotation', color:'#f5c842', size:14, isText:true },
 };
 
 Object.values(DEFAULTS).forEach(d => {
