@@ -936,7 +936,7 @@ function showToast(msg) {
   if (!t) {
     t = document.createElement('div');
     t.id = 'toast';
-    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#f5c842;color:#111;font-family:Space Mono,monospace;font-size:0.75rem;padding:10px 20px;border-radius:6px;z-index:999;font-weight:700;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
+    t.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);background:#f5c842;color:#111;font-family:Space Mono,monospace;font-size:0.75rem;padding:10px 20px;border-radius:6px;z-index:999;font-weight:700;box-shadow:0 4px 16px rgba(0,0,0,0.4)';
     document.body.appendChild(t);
   }
   t.textContent = msg;
@@ -946,16 +946,18 @@ function showToast(msg) {
 }
 
 // Init
-loadPlan();
-if (!rooms.length && !elements.length) {
-  const demoRoom = { id: makeId(), x:-200, y:-150, w:400, h:300, label:'Décor principal', color:'#fafaf7' };
-  rooms.push(demoRoom);
- 
-  // Centrer la vue sur le centre de la salle
-  const roomCenterX = demoRoom.x + demoRoom.w / 2; // 0
-  const roomCenterY = demoRoom.y + demoRoom.h / 2; // 0
-  panX = canvas.width  / 2 - roomCenterX * zoom;   // centre horizontal
-  panY = canvas.height / 2 - roomCenterY * zoom;   // centre vertical
- 
-  draw();
+if (window.innerWidth >= 768) {
+  loadPlan();
+  if (!rooms.length && !elements.length) {
+    const demoRoom = { id: makeId(), x:-200, y:-150, w:400, h:300, label:'Décor principal', color:'#fafaf7' };
+    rooms.push(demoRoom);
+  
+    // Centrer la vue sur le centre de la salle
+    const roomCenterX = demoRoom.x + demoRoom.w / 2; // 0
+    const roomCenterY = demoRoom.y + demoRoom.h / 2; // 0
+    panX = canvas.width  / 2 - roomCenterX * zoom;   // centre horizontal
+    panY = canvas.height / 2 - roomCenterY * zoom;   // centre vertical
+  
+    draw();
+  }
 }

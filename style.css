@@ -112,6 +112,22 @@ header {
   overflow: hidden;
 }
 
+.app-body .contact-link {
+  position: absolute;
+  bottom: .5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: all .3s ease-out;
+  z-index: 10;
+  padding: 1rem 0;
+}
+
+.app-body .contact-link:hover {
+  text-decoration: underline;
+  color: var(--accent);
+}
 
 /* SIDEBAR */
 .sidebar {
@@ -482,4 +498,53 @@ input[type="range"].prop-input {
   border-radius: 4px;
   opacity: 0;
   transition: opacity 0.1s;
+}
+
+.mobile-wrapper {
+  display: none;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 2rem 1.5rem;
+  z-index: 10;
+}
+
+.mobile-wrapper .logo {
+  font-size: 2rem;
+}
+
+.mobile-wrapper p {
+  font-size: 1.2rem;
+  color: var(--text);
+  text-align: center;
+}
+
+.mobile-wrapper .contact-link {
+  color: var(--text);
+  font-size: 1.2rem;
+  transition: color .3s ease-out;
+  cursor: pointer;
+}
+
+.mobile-wrapper .contact-link:active {
+  color: var(--accent);
+}
+
+@media (max-width: 768px) {
+  .mobile-wrapper {
+    display: flex;
+  }
+
+  header {
+    display: none;
+  }
+
+  .app-body {
+    display: none;
+  }
 }
