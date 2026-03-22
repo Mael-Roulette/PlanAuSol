@@ -167,6 +167,7 @@ header {
 
 .element-btn .icon {
   max-width: 60%;
+  max-height: 3rem;
 }
 
 .element-btn[data-type="camera"] .icon { 
@@ -235,7 +236,6 @@ header {
 /* PROPS PANEL */
 .props-panel {
   padding: 14px;
-  flex: 1;
 }
 
 .prop-row {

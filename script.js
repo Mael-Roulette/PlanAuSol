@@ -30,15 +30,26 @@ let resizeStartRoom = null;
 
 const HANDLE_SIZE = 8; // en pixel - px
 
+const IMAGE_CACHE = {};
+ 
+function loadImage(src) {
+  if (IMAGE_CACHE[src]) return IMAGE_CACHE[src];
+  const img = new Image();
+  img.src = src;
+  img.onload = () => draw();
+  IMAGE_CACHE[src] = img;
+  return img;
+}
+
 // ELEMENT DEFAULTS
 const DEFAULTS = {
-  camera:    { emoji:'./images/camera.svg', label:'Cam', color:'#4a9eff', size:36 },
+  camera:    { img:'./images/camera.svg', label:'Cam', color:'#4a9eff', size:36 },
   tripod:    { emoji:'🎬', label:'', color:'#4a9eff', size:36 },
   monitor:   { emoji:'🖥', label:'', color:'#4a9eff', size:36 },
   light:     { emoji:'💡', label:'Lumière', color:'#ffcc44', size:36 },
   reflector: { emoji:'🔆', label:'', color:'#ffcc44', size:36 },
   micro:     { emoji:'🎙', label:'', color:'#ffcc44', size:36 },
-  person:    { emoji:'🧍', label:'P1', color:'#ff6b6b', size:36 },
+  person:    { img:'./images/people.svg', label:'P1', color:'#ff6b6b', size:36 },
   chair:     { emoji:'🪑', label:'', color:'#7bed9f', size:32 },
   table:     { emoji:'', label:'TABLE', color:'#7bed9f', size:48, shape:'rect' },
   door:      { emoji:'🚪', label:'', color:'#aaa', size:36 },
@@ -47,6 +58,10 @@ const DEFAULTS = {
   arrow:     { emoji:'➡️', label:'', color:'#fff', size:40 },
   text:      { emoji:'', label:'Annotation', color:'#f5c842', size:14, isText:true },
 };
+
+Object.values(DEFAULTS).forEach(d => {
+  if (d.img) loadImage(d.img);
+});
 
 let idCounter = 1;
 function makeId() { return 'el_' + (idCounter++); }
@@ -239,19 +254,19 @@ function hitRoomHandle(sx, sy) {
  */
 function drawElement(el) {
   ctx.save();
-  const cx = el.x, cy = el.y;
-  ctx.translate(cx, cy);
+  ctx.translate(el.x, el.y);
   if (el.rotation) ctx.rotate(el.rotation * Math.PI / 180);
-
-  const s = (el.size || 36);
+ 
+  const s = el.size || 36;
   const d = DEFAULTS[el.type] || {};
-
+ 
   if (el.type === 'text') {
-    ctx.font = `bold ${s}px Syne`;
+    ctx.font = `bold ${s}px sans-serif`;
     ctx.fillStyle = el.color || '#f5c842';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(el.label || 'Texte', 0, 0);
+ 
   } else if (d.shape === 'rect' || el.type === 'table' || el.type === 'wall') {
     ctx.fillStyle = el.color || d.color || '#7bed9f';
     ctx.fillRect(-s/2, -s*0.3, s, s*0.6);
@@ -260,53 +275,48 @@ function drawElement(el) {
     ctx.strokeRect(-s/2, -s*0.3, s, s*0.6);
     if (el.label) {
       ctx.fillStyle = '#fff';
-      ctx.font = `bold ${Math.max(8, s*0.22)}px`;
+      ctx.font = `bold ${Math.max(8, s*0.22)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(el.label, 0, 0);
     }
+ 
   } else {
-    const fontSize = s;
-    ctx.font = `${fontSize}px serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const em = el.emoji || d.emoji || '?';
-    if (em) ctx.fillText(em, 0, 0);
-
-    if (el.type === 'camera' || el.type === 'light') {
-      ctx.strokeStyle = el.color || d.color;
-      ctx.lineWidth = 2/zoom;
-      ctx.globalAlpha = 0.5;
-      ctx.beginPath();
-      ctx.moveTo(0, -s*0.1);
-      ctx.lineTo(0, -s*0.85);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = el.color || d.color;
-      ctx.beginPath();
-      ctx.moveTo(0, -s*0.9);
-      ctx.lineTo(-4/zoom, -s*0.7);
-      ctx.lineTo(4/zoom, -s*0.7);
-      ctx.closePath();
-      ctx.fill();
+    if (d.img) {
+      const img = loadImage(d.img);
+      if (img.complete && img.naturalWidth) {
+        ctx.drawImage(img, -s/2, -s/2, s, s);
+      } else {
+        // Placeholder pendant le chargement
+        ctx.fillStyle = d.color || '#4a9eff';
+        ctx.globalAlpha = 0.3;
+        ctx.fillRect(-s/2, -s/2, s, s);
+        ctx.globalAlpha = 1;
+      }
+    } else {
+      ctx.font = `${s}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const em = el.emoji || d.emoji || '?';
+      if (em) ctx.fillText(em, 0, 0);
     }
-
+ 
     if (el.label) {
       ctx.font = `bold ${Math.max(9, s*0.28)}px Arial`;
       ctx.fillStyle = el.color || d.color || '#fff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       ctx.lineWidth = 3/zoom;
-      ctx.strokeText(el.label, 0, s*0.5+2/zoom);
       ctx.fillText(el.label, 0, s*0.5+2/zoom);
     }
   }
-
+ 
+  // Sélection
   if (el.id === selectedId) {
     ctx.strokeStyle = '#f5c842';
     ctx.lineWidth = 2 / zoom;
     ctx.setLineDash([5/zoom, 3/zoom]);
-    const r = (el.type === 'text' ? el.size * el.label.length * 0.35 : s * 0.65);
+    const r = (el.type === 'text' ? el.size * (el.label||'').length * 0.35 : s * 0.65);
     ctx.strokeRect(-r, -r, r*2, r*2);
     ctx.setLineDash([]);
     const hs = 6/zoom;
@@ -315,7 +325,7 @@ function drawElement(el) {
       ctx.fillRect(hx-hs/2, hy-hs/2, hs, hs);
     });
   }
-
+ 
   ctx.restore();
 }
 
@@ -892,17 +902,23 @@ function exportPNG() {
         ec.fillText(el.label, 0, 0);
       }
     } else {
-      ec.font = `${s}px serif`;
-      ec.textAlign = 'center';
-      ec.textBaseline = 'middle';
-      if (d.emoji) ec.fillText(d.emoji, 0, 0);
+      if (d.img) {
+        const img = loadImage(d.img);
+        if (img.complete && img.naturalWidth) {
+          ec.drawImage(img, -s/2, -s/2, s, s);
+        }
+      } else {
+        ec.font = `${s}px serif`;
+        ec.textAlign = 'center'; ec.textBaseline = 'middle';
+        const em = d.emoji || '';
+        if (em) ec.fillText(em, 0, 0);
+      }
       if (el.label) {
-        ec.font = `bold ${Math.max(9, s * 0.28)}px monospace`;
+        ec.font = `bold ${Math.max(9, s*0.28)}px monospace`;
         ec.fillStyle = el.color || d.color || '#000';
-        ec.strokeStyle = 'rgba(255,255,255,0.8)';
-        ec.lineWidth = 3 / scale;
-        ec.strokeText(el.label, 0, s * 0.6);
-        ec.fillText(el.label, 0, s * 0.6);
+        ec.strokeStyle = 'rgba(255,255,255,0.8)'; ec.lineWidth = 3 / scale;
+        ec.strokeText(el.label, 0, s*0.6);
+        ec.fillText(el.label, 0, s*0.6);
       }
     }
     ec.restore();
