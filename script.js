@@ -948,6 +948,14 @@ function showToast(msg) {
 // Init
 loadPlan();
 if (!rooms.length && !elements.length) {
-  rooms.push({ id: makeId(), x:-200, y:-150, w:400, h:300, label:'Décor principal', color:'#fafaf7' });
+  const demoRoom = { id: makeId(), x:-200, y:-150, w:400, h:300, label:'Décor principal', color:'#fafaf7' };
+  rooms.push(demoRoom);
+ 
+  // Centrer la vue sur le centre de la salle
+  const roomCenterX = demoRoom.x + demoRoom.w / 2; // 0
+  const roomCenterY = demoRoom.y + demoRoom.h / 2; // 0
+  panX = canvas.width  / 2 - roomCenterX * zoom;   // centre horizontal
+  panY = canvas.height / 2 - roomCenterY * zoom;   // centre vertical
+ 
   draw();
 }
