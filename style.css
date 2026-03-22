@@ -318,7 +318,7 @@ input[type="range"].prop-input {
 }
 
 .tool-btn {
-  font-size: 1rem;
+  font-size: .8rem;
   padding: 5px 10px;
   border: 1.5px solid var(--border);
   border-radius: var(--r);
@@ -329,7 +329,6 @@ input[type="range"].prop-input {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.65rem;
 }
 
 .tool-btn:hover { 
@@ -380,6 +379,16 @@ input[type="range"].prop-input {
   color: var(--accent); 
 }
 
+.ctx-item {
+  padding:7px 12px;
+  font-size:0.7rem;
+  cursor:pointer;
+  border-radius:4px;
+}
+
+.ctx-item-delete {
+  color: var(--accent2);
+}
 
 /* MODAL */
 .modal-overlay {

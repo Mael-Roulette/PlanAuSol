@@ -6,6 +6,7 @@ const wrapper = document.getElementById('canvas-wrapper');
 let elements = [];
 let rooms = [];
 let selectedId = null;
+let selectedRoomId = null;
 let tool = 'select';
 let zoom = 1;
 let panX = 0, panY = 0;
@@ -19,6 +20,15 @@ let history = [];
 let dragType = null;
 let pendingDrop = null;
 let ctxMenuTarget = null;
+
+// Room resize state
+let isResizingRoom = false;
+let resizeRoomId = null;
+let resizeHandle = null; // 'n','s','e','w','ne','nw','se','sw'
+let resizeStartMouse = null;
+let resizeStartRoom = null;
+
+const HANDLE_SIZE = 8; // px in screen space
 
 // ELEMENT DEFAULTS
 const DEFAULTS = {
@@ -63,24 +73,18 @@ function draw() {
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
 
-  // Background
   ctx.fillStyle = '#111';
   ctx.fillRect(0, 0, W, H);
 
-  // Grid
   drawGrid();
 
   ctx.save();
   ctx.translate(panX, panY);
   ctx.scale(zoom, zoom);
 
-  // Rooms
   rooms.forEach(r => drawRoom(r));
-
-  // Elements (sorted by z)
   [...elements].sort((a,b) => (a.z||0)-(b.z||0)).forEach(el => drawElement(el));
 
-  // Drawing room preview
   if (isDrawingRoom && roomStart && roomCurrent) {
     ctx.strokeStyle = '#f5c842';
     ctx.lineWidth = 2 / zoom;
@@ -94,6 +98,12 @@ function draw() {
   }
 
   ctx.restore();
+
+  // Draw resize handles in screen space (for selected room)
+  if (selectedRoomId) {
+    const r = rooms.find(r => r.id === selectedRoomId);
+    if (r) drawRoomHandles(r);
+  }
 }
 
 function drawGrid() {
@@ -112,10 +122,8 @@ function drawGrid() {
 
 function drawRoom(r) {
   ctx.save();
-  // Fill
   ctx.fillStyle = r.color || '#fafaf7';
   ctx.fillRect(r.x, r.y, r.w, r.h);
-  // Grid inside
   const gs = 40;
   ctx.strokeStyle = '#e0ddd5';
   ctx.lineWidth = 0.5 / zoom;
@@ -125,11 +133,20 @@ function drawRoom(r) {
   for (let gy = r.y; gy <= r.y + r.h; gy += gs) {
     ctx.beginPath(); ctx.moveTo(r.x, gy); ctx.lineTo(r.x+r.w, gy); ctx.stroke();
   }
-  // Border
-  ctx.strokeStyle = '#222';
-  ctx.lineWidth = 3 / zoom;
+
+  // Border — highlight if selected
+  if (r.id === selectedRoomId) {
+    ctx.strokeStyle = '#f5c842';
+    ctx.lineWidth = 3 / zoom;
+    ctx.setLineDash([8/zoom, 4/zoom]);
+  } else {
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 3 / zoom;
+    ctx.setLineDash([]);
+  }
   ctx.strokeRect(r.x, r.y, r.w, r.h);
-  // Label
+  ctx.setLineDash([]);
+
   if (r.label) {
     ctx.fillStyle = '#333';
     ctx.font = `bold ${14/zoom}px Syne`;
@@ -137,6 +154,59 @@ function drawRoom(r) {
     ctx.fillText(r.label, r.x+6/zoom, r.y+16/zoom);
   }
   ctx.restore();
+}
+
+function drawRoomHandles(r) {
+  const handles = getRoomHandlePositions(r);
+  handles.forEach(h => {
+    ctx.save();
+    ctx.fillStyle = '#f5c842';
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.rect(h.sx - HANDLE_SIZE/2, h.sy - HANDLE_SIZE/2, HANDLE_SIZE, HANDLE_SIZE);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+// Returns handle screen positions for a room
+function getRoomHandlePositions(r) {
+  const tl = toScreen(r.x, r.y);
+  const br = toScreen(r.x + r.w, r.y + r.h);
+  const mx = (tl.x + br.x) / 2;
+  const my = (tl.y + br.y) / 2;
+  return [
+    { id:'nw', sx: tl.x, sy: tl.y },
+    { id:'n',  sx: mx,   sy: tl.y },
+    { id:'ne', sx: br.x, sy: tl.y },
+    { id:'e',  sx: br.x, sy: my   },
+    { id:'se', sx: br.x, sy: br.y },
+    { id:'s',  sx: mx,   sy: br.y },
+    { id:'sw', sx: tl.x, sy: br.y },
+    { id:'w',  sx: tl.x, sy: my   },
+  ];
+}
+
+const HANDLE_CURSORS = {
+  n:'ns-resize', s:'ns-resize',
+  e:'ew-resize', w:'ew-resize',
+  ne:'nesw-resize', sw:'nesw-resize',
+  nw:'nwse-resize', se:'nwse-resize',
+};
+
+// Hit test a handle at screen coords
+function hitRoomHandle(sx, sy) {
+  if (!selectedRoomId) return null;
+  const r = rooms.find(r => r.id === selectedRoomId);
+  if (!r) return null;
+  const handles = getRoomHandlePositions(r);
+  const HIT = HANDLE_SIZE + 4;
+  for (const h of handles) {
+    if (Math.abs(sx - h.sx) < HIT/2 && Math.abs(sy - h.sy) < HIT/2) return h.id;
+  }
+  return null;
 }
 
 function drawElement(el) {
@@ -168,7 +238,6 @@ function drawElement(el) {
       ctx.fillText(el.label, 0, 0);
     }
   } else {
-    // Emoji element
     const fontSize = s;
     ctx.font = `${fontSize}px serif`;
     ctx.textAlign = 'center';
@@ -176,7 +245,6 @@ function drawElement(el) {
     const em = el.emoji || d.emoji || '?';
     if (em) ctx.fillText(em, 0, 0);
 
-    // Direction indicator for camera/light
     if (el.type === 'camera' || el.type === 'light') {
       ctx.strokeStyle = el.color || d.color;
       ctx.lineWidth = 2/zoom;
@@ -186,7 +254,6 @@ function drawElement(el) {
       ctx.lineTo(0, -s*0.85);
       ctx.stroke();
       ctx.globalAlpha = 1;
-      // Arrow tip
       ctx.fillStyle = el.color || d.color;
       ctx.beginPath();
       ctx.moveTo(0, -s*0.9);
@@ -208,7 +275,6 @@ function drawElement(el) {
     }
   }
 
-  // Selection ring
   if (el.id === selectedId) {
     ctx.strokeStyle = '#f5c842';
     ctx.lineWidth = 2 / zoom;
@@ -216,7 +282,6 @@ function drawElement(el) {
     const r = (el.type === 'text' ? el.size * el.label.length * 0.35 : s * 0.65);
     ctx.strokeRect(-r, -r, r*2, r*2);
     ctx.setLineDash([]);
-    // Handles
     const hs = 6/zoom;
     ctx.fillStyle = '#f5c842';
     [[-r,-r],[r,-r],[-r,r],[r,r]].forEach(([hx,hy]) => {
@@ -230,7 +295,7 @@ function drawElement(el) {
 // SNAP TO GRID
 function snap(v, g=40) { return Math.round(v/g)*g; }
 
-// HIT TEST
+// HIT TEST element
 function hitTest(wx, wy) {
   const els = [...elements].reverse();
   for (const el of els) {
@@ -240,6 +305,41 @@ function hitTest(wx, wy) {
     if (Math.abs(dx) < r+4 && Math.abs(dy) < r+4) return el;
   }
   return null;
+}
+
+// HIT TEST room (returns room or null)
+function hitRoom(wx, wy) {
+  for (let i = rooms.length - 1; i >= 0; i--) {
+    const r = rooms[i];
+    if (wx >= r.x && wx <= r.x + r.w && wy >= r.y && wy <= r.y + r.h) return r;
+  }
+  return null;
+}
+
+// CURSOR LOGIC — called on mousemove
+function updateCursor(e) {
+  if (spaceDown || isPanning) { canvas.style.cursor = isPanning ? 'grabbing' : 'grab'; return; }
+  if (tool === 'room') { canvas.style.cursor = 'crosshair'; return; }
+  if (isResizingRoom) { canvas.style.cursor = HANDLE_CURSORS[resizeHandle] || 'nwse-resize'; return; }
+  if (isDragging) { canvas.style.cursor = 'grabbing'; return; }
+
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  const w = toWorld(sx, sy);
+
+  // 1. Check resize handles of selected room (screen-space)
+  const handle = hitRoomHandle(sx, sy);
+  if (handle) { canvas.style.cursor = HANDLE_CURSORS[handle]; return; }
+
+  // 2. Check elements
+  const el = hitTest(w.x, w.y);
+  if (el) { canvas.style.cursor = 'grab'; return; }
+
+  // 3. Check rooms
+  const room = hitRoom(w.x, w.y);
+  if (room) { canvas.style.cursor = 'move'; return; }
+
+  canvas.style.cursor = 'default';
 }
 
 // MOUSE EVENTS
@@ -271,17 +371,49 @@ canvas.addEventListener('mousedown', e => {
     return;
   }
 
+  // Check room resize handle first
+  const handle = hitRoomHandle(sx, sy);
+  if (handle) {
+    isResizingRoom = true;
+    resizeHandle = handle;
+    resizeRoomId = selectedRoomId;
+    resizeStartMouse = { x: w.x, y: w.y };
+    const r = rooms.find(r => r.id === selectedRoomId);
+    resizeStartRoom = { ...r };
+    saveHistory();
+    canvas.style.cursor = HANDLE_CURSORS[handle];
+    return;
+  }
+
+  // Check elements
   const hit = hitTest(w.x, w.y);
   if (hit) {
     selectedId = hit.id;
+    selectedRoomId = null;
     isDragging = true;
     dragOffX = w.x - hit.x;
     dragOffY = w.y - hit.y;
     updatePropsPanel();
-  } else {
+    draw();
+    mouseDown = true;
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+
+  // Check rooms
+  const room = hitRoom(w.x, w.y);
+  if (room) {
+    selectedRoomId = room.id;
     selectedId = null;
     updatePropsPanel();
+    draw();
+    return;
   }
+
+  // Click on empty → deselect all
+  selectedId = null;
+  selectedRoomId = null;
+  updatePropsPanel();
   draw();
   mouseDown = true;
 });
@@ -306,6 +438,15 @@ canvas.addEventListener('mousemove', e => {
     return;
   }
 
+  if (isResizingRoom) {
+    const r = rooms.find(r => r.id === resizeRoomId);
+    if (r) {
+      applyRoomResize(r, resizeHandle, resizeStartRoom, resizeStartMouse, w);
+      draw();
+    }
+    return;
+  }
+
   if (isDragging && selectedId) {
     const el = elements.find(e => e.id === selectedId);
     if (el) {
@@ -314,6 +455,8 @@ canvas.addEventListener('mousemove', e => {
       draw();
     }
   }
+
+  updateCursor(e);
 });
 
 canvas.addEventListener('mouseup', e => {
@@ -324,15 +467,26 @@ canvas.addEventListener('mouseup', e => {
     const h = Math.abs(roomCurrent.y - roomStart.y);
     if (w > 40 && h > 40) {
       saveHistory();
-      rooms.push({ id: makeId(), x, y, w, h, label: 'Salle', color: '#fafaf8' });
+      const newRoom = { id: makeId(), x, y, w, h, label: 'Salle', color: '#fafaf8' };
+      rooms.push(newRoom);
+      selectedRoomId = newRoom.id;
     }
     isDrawingRoom = false; roomStart = null; roomCurrent = null;
   }
+
+  if (isResizingRoom) {
+    isResizingRoom = false;
+    resizeHandle = null;
+    resizeRoomId = null;
+  }
+
   if (isDragging) { saveHistory(); }
   isDragging = false;
   isPanning = false;
   mouseDown = false;
-  canvas.style.cursor = 'crosshair';
+
+  const rect = canvas.getBoundingClientRect();
+  updateCursor({ clientX: e.clientX, clientY: e.clientY });
   draw();
 });
 
@@ -351,6 +505,30 @@ canvas.addEventListener('wheel', e => {
   draw();
 }, { passive: false });
 
+// Apply resize to a room given handle direction
+function applyRoomResize(r, handle, start, startMouse, mouse) {
+  const dx = mouse.x - startMouse.x;
+  const dy = mouse.y - startMouse.y;
+  const MIN = 80;
+
+  let newX = start.x, newY = start.y, newW = start.w, newH = start.h;
+
+  if (handle.includes('e')) { newW = Math.max(MIN, snap(start.w + dx)); }
+  if (handle.includes('s')) { newH = Math.max(MIN, snap(start.h + dy)); }
+  if (handle.includes('w')) {
+    const dxSnapped = snap(dx);
+    const candidate = start.w - dxSnapped;
+    if (candidate >= MIN) { newX = start.x + dxSnapped; newW = candidate; }
+  }
+  if (handle.includes('n')) {
+    const dySnapped = snap(dy);
+    const candidate = start.h - dySnapped;
+    if (candidate >= MIN) { newY = start.y + dySnapped; newH = candidate; }
+  }
+
+  r.x = newX; r.y = newY; r.w = newW; r.h = newH;
+}
+
 // KEYBOARD
 window.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
@@ -359,7 +537,7 @@ window.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key === 'z') undo();
 });
 window.addEventListener('keyup', e => {
-  if (e.code === 'Space') { spaceDown = false; canvas.style.cursor = 'crosshair'; }
+  if (e.code === 'Space') { spaceDown = false; canvas.style.cursor = 'default'; }
 });
 
 // DRAG FROM SIDEBAR
@@ -396,6 +574,7 @@ function addElement(type, x, y) {
     z: elements.length,
   });
   selectedId = elements[elements.length-1].id;
+  selectedRoomId = null;
   updatePropsPanel();
   draw();
 }
@@ -446,30 +625,37 @@ function undo() {
   elements = state.elements;
   rooms = state.rooms;
   selectedId = null;
+  selectedRoomId = null;
   updatePropsPanel();
   draw();
 }
 
 function deleteSelected() {
-  if (!selectedId) return;
-  saveHistory();
-  elements = elements.filter(e => e.id !== selectedId);
-  selectedId = null;
-  updatePropsPanel();
-  draw();
+  if (selectedId) {
+    saveHistory();
+    elements = elements.filter(e => e.id !== selectedId);
+    selectedId = null;
+    updatePropsPanel();
+    draw();
+  } else if (selectedRoomId) {
+    saveHistory();
+    rooms = rooms.filter(r => r.id !== selectedRoomId);
+    selectedRoomId = null;
+    draw();
+  }
 }
 
 function clearAll() {
   if (!confirm('Effacer tout le plan ?')) return;
   saveHistory();
-  elements = []; rooms = []; selectedId = null;
+  elements = []; rooms = []; selectedId = null; selectedRoomId = null;
   updatePropsPanel();
   draw();
 }
 
 function newPlan() {
   if (!confirm('Créer un nouveau plan ? (les modifications non sauvegardées seront perdues)')) return;
-  elements = []; rooms = []; selectedId = null; history = [];
+  elements = []; rooms = []; selectedId = null; selectedRoomId = null; history = [];
   document.getElementById('plan-name').value = 'Mon plan de tournage';
   resetZoom();
   updatePropsPanel();
@@ -535,7 +721,6 @@ function loadPlan() {
   showToast('Plan restauré : ' + data.name);
 }
 
-// Auto-save every 30s
 setInterval(() => {
   const name = document.getElementById('plan-name').value || 'autosave';
   localStorage.setItem('planausol_' + name, JSON.stringify({ name, elements, rooms, zoom, panX, panY }));
@@ -549,7 +734,6 @@ function exportPNG() {
   const ec = exp.getContext('2d');
   ec.fillStyle = '#fafaf7';
   ec.fillRect(0, 0, exp.width, exp.height);
-  // Draw rooms
   rooms.forEach(r => {
     ec.save();
     ec.fillStyle = r.color || '#fafaf7';
@@ -559,12 +743,10 @@ function exportPNG() {
     ec.strokeRect(r.x + 800, r.y + 550, r.w, r.h);
     ec.restore();
   });
-  // Draw grid
   ec.strokeStyle = '#ddd';
   ec.lineWidth = 0.5;
   for (let gx = 0; gx < exp.width; gx += 40) { ec.beginPath(); ec.moveTo(gx,0); ec.lineTo(gx,exp.height); ec.stroke(); }
   for (let gy = 0; gy < exp.height; gy += 40) { ec.beginPath(); ec.moveTo(0,gy); ec.lineTo(exp.width,gy); ec.stroke(); }
-  // Draw elements
   elements.forEach(el => {
     const d = DEFAULTS[el.type] || {};
     ec.save();
@@ -604,34 +786,15 @@ function exportPNG() {
     }
     ec.restore();
   });
-  // Watermark
   ec.fillStyle = '#999';
   ec.font = '13px monospace';
   ec.textAlign = 'right';
-  ec.fillText('PlanAuSol — ' + (document.getElementById('plan-name').value || ''), exp.width - 14, exp.height - 14);
+  ec.fillText('PlanAuSol - ' + (document.getElementById('plan-name').value || ''), exp.width - 14, exp.height - 14);
 
   const link = document.createElement('a');
   link.download = (document.getElementById('plan-name').value || 'plan') + '.png';
   link.href = exp.toDataURL('image/png');
   link.click();
-}
-
-// EXPORT PDF
-function exportPDF() {
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
-  const name = document.getElementById('plan-name').value || 'Plan de tournage';
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(18);
-  pdf.text(name, 148, 16, { align:'center' });
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(150);
-  pdf.text('PlanAuSol — ' + new Date().toLocaleDateString('fr-FR'), 148, 22, { align:'center' });
-  // Draw from canvas (capture)
-  const dataUrl = canvas.toDataURL('image/png');
-  pdf.addImage(dataUrl, 'PNG', 10, 28, 277, 175);
-  pdf.save(name + '.pdf');
 }
 
 // TOAST
@@ -652,7 +815,6 @@ function showToast(msg) {
 // INIT
 loadPlan();
 if (!rooms.length && !elements.length) {
-  // Demo room
   rooms.push({ id: makeId(), x:-200, y:-150, w:400, h:300, label:'Décor principal', color:'#fafaf7' });
   draw();
 }

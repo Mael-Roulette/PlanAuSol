@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Plan Au Sol — Tournage audiovisuel</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,16 +13,47 @@
   <div class="header-sep"></div>
   <div class="header-actions">
     <input id="plan-name" class="prop-input-full" style="width:200px;background:var(--surface2)" placeholder="Nom du plan..." value="Mon plan de tournage">
-    <button class="btn" onclick="newPlan()">🗋 Nouveau</button>
-    <button class="btn" onclick="exportPNG()">🖼 PNG</button>
-    <button class="btn" onclick="exportPDF()">📄 PDF</button>
-    <button class="btn primary" onclick="savePlan()">💾 Sauvegarder</button>
+    <button class="btn" onclick="newPlan()">Nouveau</button>
+    <button class="btn" onclick="exportPNG()">Export PNG</button>
+    <button class="btn primary" onclick="savePlan()">Sauvegarder</button>
   </div>
 </header>
 
 <div class="app-body">
   <!-- Sidebar -->
   <div class="sidebar">
+    <!-- Propriété -->
+    <div class="props-panel" id="props-panel">
+      <div class="sidebar-title">Propriétés</div>
+      <div id="no-selection" class="no-selection">Sélectionnez<br>un élément</div>
+      <div id="selection-props" style="display:none">
+        <div class="prop-row">
+          <span class="prop-label">Label</span>
+          <input id="prop-label" class="prop-input" style="width:100%" oninput="updateSelectedProp('label',this.value)">
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Rotation</span>
+          <input id="prop-rotation" type="range" class="prop-input" min="0" max="360" oninput="updateSelectedProp('rotation',+this.value);document.getElementById('rot-val').textContent=this.value+'°'">
+        </div>
+        <div class="prop-row" style="justify-content:flex-end">
+          <span id="rot-val" class="prop-label" style="color:var(--text)">0°</span>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Couleur</span>
+          <input id="prop-color" type="color" class="prop-input" oninput="updateSelectedProp('color',this.value)">
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Taille</span>
+          <input id="prop-size" type="range" class="prop-input" min="20" max="120" oninput="updateSelectedProp('size',+this.value)">
+        </div>
+        <div style="margin-top:8px">
+          <button class="btn danger" onclick="deleteSelected()">Supprimer</button>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
     <div class="sidebar-section">
       <div class="sidebar-title">Caméras & Vidéo</div>
       <div class="elements-grid">
@@ -74,51 +103,20 @@
         <div class="element-btn" draggable="true" data-type="text"><span class="icon">Aa</span>Texte</div>
       </div>
     </div>
-    <hr class="divider">
-
-    <!-- Propriété -->
-    <div class="props-panel" id="props-panel">
-      <div class="sidebar-title">Propriétés</div>
-      <div id="no-selection" class="no-selection">Sélectionnez<br>un élément</div>
-      <div id="selection-props" style="display:none">
-        <div class="prop-row">
-          <span class="prop-label">Label</span>
-          <input id="prop-label" class="prop-input" style="width:100%" oninput="updateSelectedProp('label',this.value)">
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">Rotation</span>
-          <input id="prop-rotation" type="range" class="prop-input" min="0" max="360" oninput="updateSelectedProp('rotation',+this.value);document.getElementById('rot-val').textContent=this.value+'°'">
-        </div>
-        <div class="prop-row" style="justify-content:flex-end">
-          <span id="rot-val" class="prop-label" style="color:var(--text)">0°</span>
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">Couleur</span>
-          <input id="prop-color" type="color" class="prop-input" oninput="updateSelectedProp('color',this.value)">
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">Taille</span>
-          <input id="prop-size" type="range" class="prop-input" min="20" max="120" oninput="updateSelectedProp('size',+this.value)">
-        </div>
-        <div style="margin-top:8px">
-          <button class="btn danger" style="width:100%;font-size:0.65rem" onclick="deleteSelected()">🗑 Supprimer</button>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- CANVAS AREA -->
   <div class="canvas-area">
     <div class="canvas-toolbar">
-      <button class="tool-btn active" id="tool-select" onclick="setTool('select')">↖ Sélection</button>
-      <button class="tool-btn" id="tool-room" onclick="setTool('room')">⬜ Tracer salle</button>
-      <button class="tool-btn" onclick="zoomIn()">＋</button>
+      <button class="tool-btn active" id="tool-select" onclick="setTool('select')">Sélection</button>
+      <button class="tool-btn" id="tool-room" onclick="setTool('room')">Tracer salle</button>
+      <button class="tool-btn" onclick="zoomOut()">-</button>
       <span class="zoom-display" id="zoom-display">100%</span>
-      <button class="tool-btn" onclick="zoomOut()">－</button>
+      <button class="tool-btn" onclick="zoomIn()">+</button>
       <button class="tool-btn" onclick="resetZoom()">⊞ Reset vue</button>
       <div style="flex:1"></div>
       <button class="tool-btn" onclick="undo()">↩ Annuler</button>
-      <button class="tool-btn" onclick="clearAll()">🗑 Tout effacer</button>
+      <button class="tool-btn" onclick="clearAll()">Tout effacer</button>
     </div>
     <div class="canvas-wrapper" id="canvas-wrapper">
       <canvas id="main-canvas"></canvas>
@@ -136,11 +134,11 @@
 
 <!-- Context Menu -->
 <div id="ctx-menu" style="display:none;position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px;z-index:200;min-width:140px;box-shadow:0 8px 24px rgba(0,0,0,0.5)">
-  <div class="ctx-item" onclick="ctxDuplicate()" style="padding:7px 12px;font-family:'Space Mono',monospace;font-size:0.65rem;cursor:pointer;border-radius:4px;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">⧉ Dupliquer</div>
-  <div class="ctx-item" onclick="ctxToFront()" style="padding:7px 12px;font-family:'Space Mono',monospace;font-size:0.65rem;cursor:pointer;border-radius:4px;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">⬆ Mettre devant</div>
-  <div class="ctx-item" onclick="ctxToBack()" style="padding:7px 12px;font-family:'Space Mono',monospace;font-size:0.65rem;cursor:pointer;border-radius:4px;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">⬇ Mettre derrière</div>
+  <div class="ctx-item" onclick="ctxDuplicate()" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">Dupliquer</div>
+  <div class="ctx-item" onclick="ctxToFront()" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">Mettre devant</div>
+  <div class="ctx-item" onclick="ctxToBack()" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">Mettre derrière</div>
   <hr style="border-color:var(--border);margin:3px 0">
-  <div class="ctx-item" onclick="deleteSelected()" style="padding:7px 12px;font-family:'Space Mono',monospace;font-size:0.65rem;cursor:pointer;border-radius:4px;color:var(--accent2)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">🗑 Supprimer</div>
+  <div class="ctx-item ctx-item-delete" onclick="deleteSelected()" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">Supprimer</div>
 </div>
 
 <script src="script.js"></script>
