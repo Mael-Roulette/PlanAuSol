@@ -88,15 +88,6 @@
     </div>
     <hr class="divider">
     <div class="sidebar-section">
-      <div class="sidebar-title">Architecture</div>
-      <div class="elements-grid">
-        <div class="element-btn" draggable="true" data-type="door"><span class="icon">🚪</span>Porte</div>
-        <div class="element-btn" draggable="true" data-type="window"><span class="icon">🪟</span>Fenêtre</div>
-        <div class="element-btn" draggable="true" data-type="wall"><span class="icon">▬</span>Mur</div>
-      </div>
-    </div>
-    <hr class="divider">
-    <div class="sidebar-section">
       <div class="sidebar-title">Annotations</div>
       <div class="elements-grid">
         <div class="element-btn" draggable="true" data-type="arrow"><span class="icon">➡️</span>Flèche</div>
@@ -133,7 +124,7 @@
 </div>
 
 <!-- Context Menu -->
-<div id="ctx-menu" style="display:none;position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px;z-index:200;min-width:140px;box-shadow:0 8px 24px rgba(0,0,0,0.5)">
+<div id="ctx-menu">
   <div class="ctx-item" onclick="ctxDuplicate()" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">Dupliquer</div>
   <div class="ctx-item" onclick="ctxToFront()" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">Mettre devant</div>
   <div class="ctx-item" onclick="ctxToBack()" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">Mettre derrière</div>

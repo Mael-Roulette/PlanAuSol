@@ -2,7 +2,7 @@ const canvas = document.getElementById('main-canvas');
 const ctx = canvas.getContext('2d');
 const wrapper = document.getElementById('canvas-wrapper');
 
-// STATE
+
 let elements = [];
 let rooms = [];
 let selectedId = null;
@@ -28,7 +28,7 @@ let resizeHandle = null; // 'n','s','e','w','ne','nw','se','sw'
 let resizeStartMouse = null;
 let resizeStartRoom = null;
 
-const HANDLE_SIZE = 8; // px in screen space
+const HANDLE_SIZE = 8; // en pixel - px
 
 // ELEMENT DEFAULTS
 const DEFAULTS = {
@@ -51,7 +51,7 @@ const DEFAULTS = {
 let idCounter = 1;
 function makeId() { return 'el_' + (idCounter++); }
 
-// RESIZE CANVAS
+// Permet de resize le canva
 function resize() {
   canvas.width = wrapper.clientWidth;
   canvas.height = wrapper.clientHeight;
@@ -106,8 +106,11 @@ function draw() {
   }
 }
 
+/**
+ * Permet de dessiner la grille du fond
+ */
 function drawGrid() {
-  const gridSize = 40 * zoom;
+  const gridSize = 40 * zoom; // Taille des carreaux
   const ox = panX % gridSize;
   const oy = panY % gridSize;
   ctx.strokeStyle = 'rgba(255,255,255,0.04)';
@@ -120,6 +123,9 @@ function drawGrid() {
   }
 }
 
+/**
+ * Permet de dessiner une salle
+ */
 function drawRoom(r) {
   ctx.save();
   ctx.fillStyle = r.color || '#fafaf7';
@@ -134,7 +140,7 @@ function drawRoom(r) {
     ctx.beginPath(); ctx.moveTo(r.x, gy); ctx.lineTo(r.x+r.w, gy); ctx.stroke();
   }
 
-  // Border — highlight if selected
+  // Si la room est select, on met une bordure dessus
   if (r.id === selectedRoomId) {
     ctx.strokeStyle = '#f5c842';
     ctx.lineWidth = 3 / zoom;
@@ -144,18 +150,25 @@ function drawRoom(r) {
     ctx.lineWidth = 3 / zoom;
     ctx.setLineDash([]);
   }
+  
   ctx.strokeRect(r.x, r.y, r.w, r.h);
   ctx.setLineDash([]);
 
+  // Label de la salle
   if (r.label) {
     ctx.fillStyle = '#333';
     ctx.font = `bold ${14/zoom}px Syne`;
     ctx.textAlign = 'left';
     ctx.fillText(r.label, r.x+6/zoom, r.y+16/zoom);
   }
+
   ctx.restore();
 }
 
+/**
+ * Dessiner les carré pour resize la salle
+ * @param {*} r salle à resize
+ */
 function drawRoomHandles(r) {
   const handles = getRoomHandlePositions(r);
   handles.forEach(h => {
@@ -171,12 +184,19 @@ function drawRoomHandles(r) {
   });
 }
 
-// Returns handle screen positions for a room
+
+/**
+ * Permet de récupère la position des manettes d'une salle
+ * @param {*} r salle en modification
+ * @returns les coordonnées des manettes
+ */
 function getRoomHandlePositions(r) {
   const tl = toScreen(r.x, r.y);
   const br = toScreen(r.x + r.w, r.y + r.h);
   const mx = (tl.x + br.x) / 2;
   const my = (tl.y + br.y) / 2;
+
+  // Retourne selon les valeurs Nord, Sud, Est, Ouest
   return [
     { id:'nw', sx: tl.x, sy: tl.y },
     { id:'n',  sx: mx,   sy: tl.y },
@@ -189,6 +209,7 @@ function getRoomHandlePositions(r) {
   ];
 }
 
+// Nom des manettes de redimenbsionnement
 const HANDLE_CURSORS = {
   n:'ns-resize', s:'ns-resize',
   e:'ew-resize', w:'ew-resize',
@@ -196,19 +217,26 @@ const HANDLE_CURSORS = {
   nw:'nwse-resize', se:'nwse-resize',
 };
 
-// Hit test a handle at screen coords
 function hitRoomHandle(sx, sy) {
   if (!selectedRoomId) return null;
+
   const r = rooms.find(r => r.id === selectedRoomId);
   if (!r) return null;
+
   const handles = getRoomHandlePositions(r);
   const HIT = HANDLE_SIZE + 4;
+
   for (const h of handles) {
     if (Math.abs(sx - h.sx) < HIT/2 && Math.abs(sy - h.sy) < HIT/2) return h.id;
   }
+
   return null;
 }
 
+/**
+ * Dessine un élément sur le canva
+ * @param {*} el element à dessiner
+ */
 function drawElement(el) {
   ctx.save();
   const cx = el.x, cy = el.y;
@@ -232,7 +260,7 @@ function drawElement(el) {
     ctx.strokeRect(-s/2, -s*0.3, s, s*0.6);
     if (el.label) {
       ctx.fillStyle = '#fff';
-      ctx.font = `bold ${Math.max(8, s*0.22)}px Space Mono`;
+      ctx.font = `bold ${Math.max(8, s*0.22)}px`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(el.label, 0, 0);
@@ -264,11 +292,10 @@ function drawElement(el) {
     }
 
     if (el.label) {
-      ctx.font = `bold ${Math.max(9, s*0.28)}px Space Mono`;
+      ctx.font = `bold ${Math.max(9, s*0.28)}px Arial`;
       ctx.fillStyle = el.color || d.color || '#fff';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
       ctx.lineWidth = 3/zoom;
       ctx.strokeText(el.label, 0, s*0.5+2/zoom);
       ctx.fillText(el.label, 0, s*0.5+2/zoom);
@@ -292,10 +319,16 @@ function drawElement(el) {
   ctx.restore();
 }
 
-// SNAP TO GRID
-function snap(v, g=40) { return Math.round(v/g)*g; }
+/**
+ * Permet aux élements de se coller à la grille
+ */
+function snap(v, g=40) { 
+  return Math.round(v/g)*g; 
+}
 
-// HIT TEST element
+/**
+ * Détecte un clique sur un élément
+ */
 function hitTest(wx, wy) {
   const els = [...elements].reverse();
   for (const el of els) {
@@ -307,7 +340,9 @@ function hitTest(wx, wy) {
   return null;
 }
 
-// HIT TEST room (returns room or null)
+/**
+ * Détecte un clique sur une salle
+ */
 function hitRoom(wx, wy) {
   for (let i = rooms.length - 1; i >= 0; i--) {
     const r = rooms[i];
@@ -316,7 +351,9 @@ function hitRoom(wx, wy) {
   return null;
 }
 
-// CURSOR LOGIC — called on mousemove
+/**
+ * Change le curseur en fonction de ce qu'il fait (survol, clic, drag)
+ */
 function updateCursor(e) {
   if (spaceDown || isPanning) { canvas.style.cursor = isPanning ? 'grabbing' : 'grab'; return; }
   if (tool === 'room') { canvas.style.cursor = 'crosshair'; return; }
@@ -327,22 +364,18 @@ function updateCursor(e) {
   const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
   const w = toWorld(sx, sy);
 
-  // 1. Check resize handles of selected room (screen-space)
   const handle = hitRoomHandle(sx, sy);
   if (handle) { canvas.style.cursor = HANDLE_CURSORS[handle]; return; }
 
-  // 2. Check elements
   const el = hitTest(w.x, w.y);
   if (el) { canvas.style.cursor = 'grab'; return; }
 
-  // 3. Check rooms
   const room = hitRoom(w.x, w.y);
   if (room) { canvas.style.cursor = 'move'; return; }
 
   canvas.style.cursor = 'default';
 }
 
-// MOUSE EVENTS
 canvas.addEventListener('mousedown', e => {
   e.preventDefault();
   closeCtxMenu();
@@ -371,7 +404,6 @@ canvas.addEventListener('mousedown', e => {
     return;
   }
 
-  // Check room resize handle first
   const handle = hitRoomHandle(sx, sy);
   if (handle) {
     isResizingRoom = true;
@@ -385,7 +417,6 @@ canvas.addEventListener('mousedown', e => {
     return;
   }
 
-  // Check elements
   const hit = hitTest(w.x, w.y);
   if (hit) {
     selectedId = hit.id;
@@ -400,7 +431,6 @@ canvas.addEventListener('mousedown', e => {
     return;
   }
 
-  // Check rooms
   const room = hitRoom(w.x, w.y);
   if (room) {
     selectedRoomId = room.id;
@@ -410,7 +440,7 @@ canvas.addEventListener('mousedown', e => {
     return;
   }
 
-  // Click on empty → deselect all
+  // Si clique sur rien on désélectionne tout
   selectedId = null;
   selectedRoomId = null;
   updatePropsPanel();
@@ -505,7 +535,6 @@ canvas.addEventListener('wheel', e => {
   draw();
 }, { passive: false });
 
-// Apply resize to a room given handle direction
 function applyRoomResize(r, handle, start, startMouse, mouse) {
   const dx = mouse.x - startMouse.x;
   const dy = mouse.y - startMouse.y;
@@ -529,7 +558,7 @@ function applyRoomResize(r, handle, start, startMouse, mouse) {
   r.x = newX; r.y = newY; r.w = newW; r.h = newH;
 }
 
-// KEYBOARD
+
 window.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
   if (e.code === 'Space') { spaceDown = true; canvas.style.cursor = 'grab'; e.preventDefault(); }
@@ -540,7 +569,9 @@ window.addEventListener('keyup', e => {
   if (e.code === 'Space') { spaceDown = false; canvas.style.cursor = 'default'; }
 });
 
-// DRAG FROM SIDEBAR
+/**
+ * Drag un élément de la sidebar
+ */
 document.querySelectorAll('.element-btn').forEach(btn => {
   btn.addEventListener('dragstart', e => {
     dragType = btn.dataset.type;
@@ -579,7 +610,6 @@ function addElement(type, x, y) {
   draw();
 }
 
-// PROPS
 function updatePropsPanel() {
   const el = elements.find(e => e.id === selectedId);
   document.getElementById('no-selection').style.display = el ? 'none' : 'block';
@@ -600,7 +630,7 @@ function updateSelectedProp(prop, val) {
   draw();
 }
 
-// TOOLS
+// Outils
 function setTool(t) {
   tool = t;
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
@@ -608,17 +638,37 @@ function setTool(t) {
   canvas.style.cursor = t === 'room' ? 'crosshair' : 'default';
 }
 
-// ZOOM
-function zoomIn() { zoom = Math.min(4, zoom * 1.2); updateZoomDisplay(); draw(); }
-function zoomOut() { zoom = Math.max(0.2, zoom / 1.2); updateZoomDisplay(); draw(); }
-function resetZoom() { zoom = 1; panX = 0; panY = 0; updateZoomDisplay(); draw(); }
-function updateZoomDisplay() { document.getElementById('zoom-display').textContent = Math.round(zoom*100)+'%'; }
+// Zoom
+function zoomIn() { 
+  zoom = Math.min(4, zoom * 1.2); 
+  updateZoomDisplay(); 
+  draw(); 
+}
 
-// HISTORY
+function zoomOut() { 
+  zoom = Math.max(0.2, zoom / 1.2); 
+  updateZoomDisplay(); 
+  draw(); 
+}
+
+function resetZoom() { 
+  zoom = 1;
+  panX = 0; 
+  panY = 0; 
+  updateZoomDisplay(); 
+  draw(); 
+}
+
+function updateZoomDisplay() { 
+  document.getElementById('zoom-display').textContent = Math.round(zoom*100)+'%'; 
+}
+
+// Historique
 function saveHistory() {
   history.push(JSON.stringify({ elements, rooms }));
   if (history.length > 40) history.shift();
 }
+
 function undo() {
   if (!history.length) return;
   const state = JSON.parse(history.pop());
@@ -662,7 +712,7 @@ function newPlan() {
   draw();
 }
 
-// CONTEXT MENU
+// Menu contextuelle (dupliquer, ...)
 function showCtxMenu(x, y) {
   const m = document.getElementById('ctx-menu');
   m.style.display = 'block';
@@ -695,15 +745,19 @@ function ctxToBack() {
   draw();
 }
 
-// SAVE / LOAD
+// Sauvegardé et chargé un plan
 function savePlan() {
   const name = document.getElementById('plan-name').value || 'plan';
   const data = { name, elements, rooms, zoom, panX, panY };
   localStorage.setItem('planausol_' + name, JSON.stringify(data));
   localStorage.setItem('planausol_last', name);
-  showToast('Plan sauvegardé ✓');
+  showToast('Plan sauvegardé');
 }
 
+/**
+ * charge un plan du localstorage
+ * @returns le plan récupérer
+ */
 function loadPlan() {
   const lastName = localStorage.getItem('planausol_last');
   if (!lastName) return;
@@ -721,38 +775,103 @@ function loadPlan() {
   showToast('Plan restauré : ' + data.name);
 }
 
+// Permet de sauvegarder toute les 30 secondes
 setInterval(() => {
   const name = document.getElementById('plan-name').value || 'autosave';
   localStorage.setItem('planausol_' + name, JSON.stringify({ name, elements, rooms, zoom, panX, panY }));
   localStorage.setItem('planausol_last', name);
 }, 30000);
 
-// EXPORT PNG
+// Export png du plan au sol
 function exportPNG() {
+  const PADDING = 80;
+  const OUT_W = 1600, OUT_H = 1100;
+ 
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+ 
+  rooms.forEach(r => {
+    minX = Math.min(minX, r.x);
+    minY = Math.min(minY, r.y);
+    maxX = Math.max(maxX, r.x + r.w);
+    maxY = Math.max(maxY, r.y + r.h);
+  });
+ 
+  elements.forEach(el => {
+    const s = el.size || 36;
+    minX = Math.min(minX, el.x - s);
+    minY = Math.min(minY, el.y - s);
+    maxX = Math.max(maxX, el.x + s);
+    maxY = Math.max(maxY, el.y + s);
+  });
+ 
+  if (!isFinite(minX)) { minX = -200; minY = -150; maxX = 200; maxY = 150; }
+ 
+  const contentW = maxX - minX;
+  const contentH = maxY - minY;
+ 
+  const scaleX = (OUT_W - PADDING * 2) / contentW;
+  const scaleY = (OUT_H - PADDING * 2) / contentH;
+  const scale = Math.min(scaleX, scaleY, 2); // max 2x pour ne pas pixéliser
+ 
+  const scaledW = contentW * scale;
+  const scaledH = contentH * scale;
+  const offX = (OUT_W - scaledW) / 2 - minX * scale;
+  const offY = (OUT_H - scaledH) / 2 - minY * scale;
+ 
   const exp = document.createElement('canvas');
-  exp.width = 1600; exp.height = 1100;
+  exp.width = OUT_W; exp.height = OUT_H;
   const ec = exp.getContext('2d');
+ 
+  // Fond blanc
   ec.fillStyle = '#fafaf7';
-  ec.fillRect(0, 0, exp.width, exp.height);
+  ec.fillRect(0, 0, OUT_W, OUT_H);
+ 
+  // Grille
+  const gs = 40 * scale;
+  const gox = offX % gs, goy = offY % gs;
+  ec.strokeStyle = '#ddd';
+  ec.lineWidth = 0.5;
+  for (let gx = gox; gx < OUT_W; gx += gs) { ec.beginPath(); ec.moveTo(gx, 0); ec.lineTo(gx, OUT_H); ec.stroke(); }
+  for (let gy = goy; gy < OUT_H; gy += gs) { ec.beginPath(); ec.moveTo(0, gy); ec.lineTo(OUT_W, gy); ec.stroke(); }
+ 
+  ec.save();
+  ec.translate(offX, offY);
+  ec.scale(scale, scale);
+ 
+  // Salles
   rooms.forEach(r => {
     ec.save();
     ec.fillStyle = r.color || '#fafaf7';
-    ec.fillRect(r.x + 800, r.y + 550, r.w, r.h);
+    ec.fillRect(r.x, r.y, r.w, r.h);
+    // Grille intérieure
+    ec.strokeStyle = '#e0ddd5';
+    ec.lineWidth = 0.5 / scale;
+    for (let gx = r.x; gx <= r.x + r.w; gx += 40) {
+      ec.beginPath(); ec.moveTo(gx, r.y); ec.lineTo(gx, r.y + r.h); ec.stroke();
+    }
+    for (let gy = r.y; gy <= r.y + r.h; gy += 40) {
+      ec.beginPath(); ec.moveTo(r.x, gy); ec.lineTo(r.x + r.w, gy); ec.stroke();
+    }
     ec.strokeStyle = '#222';
-    ec.lineWidth = 3;
-    ec.strokeRect(r.x + 800, r.y + 550, r.w, r.h);
+    ec.lineWidth = 3 / scale;
+    ec.strokeRect(r.x, r.y, r.w, r.h);
+    if (r.label) {
+      ec.fillStyle = '#333';
+      ec.font = `bold ${14 / scale}px sans-serif`;
+      ec.textAlign = 'left';
+      ec.fillText(r.label, r.x + 6 / scale, r.y + 16 / scale);
+    }
     ec.restore();
   });
-  ec.strokeStyle = '#ddd';
-  ec.lineWidth = 0.5;
-  for (let gx = 0; gx < exp.width; gx += 40) { ec.beginPath(); ec.moveTo(gx,0); ec.lineTo(gx,exp.height); ec.stroke(); }
-  for (let gy = 0; gy < exp.height; gy += 40) { ec.beginPath(); ec.moveTo(0,gy); ec.lineTo(exp.width,gy); ec.stroke(); }
+ 
+  // Éléments
   elements.forEach(el => {
     const d = DEFAULTS[el.type] || {};
     ec.save();
-    ec.translate(el.x + 800, el.y + 550);
+    ec.translate(el.x, el.y);
     if (el.rotation) ec.rotate(el.rotation * Math.PI / 180);
     const s = el.size || 36;
+ 
     if (el.type === 'text') {
       ec.font = `bold ${s}px sans-serif`;
       ec.fillStyle = el.color || '#f5c842';
@@ -761,43 +880,49 @@ function exportPNG() {
       ec.fillText(el.label || 'Texte', 0, 0);
     } else if (d.shape === 'rect' || el.type === 'table' || el.type === 'wall') {
       ec.fillStyle = el.color || d.color || '#7bed9f';
-      ec.fillRect(-s/2, -s*0.3, s, s*0.6);
+      ec.fillRect(-s / 2, -s * 0.3, s, s * 0.6);
       ec.strokeStyle = 'rgba(0,0,0,0.3)';
-      ec.lineWidth = 1.5;
-      ec.strokeRect(-s/2, -s*0.3, s, s*0.6);
-      ec.fillStyle = '#fff';
-      ec.font = `bold ${s*0.22}px monospace`;
-      ec.textAlign = 'center';
-      ec.textBaseline = 'middle';
-      if (el.label) ec.fillText(el.label, 0, 0);
+      ec.lineWidth = 1.5 / scale;
+      ec.strokeRect(-s / 2, -s * 0.3, s, s * 0.6);
+      if (el.label) {
+        ec.fillStyle = '#fff';
+        ec.font = `bold ${Math.max(8, s * 0.22)}px monospace`;
+        ec.textAlign = 'center';
+        ec.textBaseline = 'middle';
+        ec.fillText(el.label, 0, 0);
+      }
     } else {
       ec.font = `${s}px serif`;
       ec.textAlign = 'center';
       ec.textBaseline = 'middle';
       if (d.emoji) ec.fillText(d.emoji, 0, 0);
       if (el.label) {
-        ec.font = `bold ${Math.max(9, s*0.28)}px monospace`;
+        ec.font = `bold ${Math.max(9, s * 0.28)}px monospace`;
         ec.fillStyle = el.color || d.color || '#000';
         ec.strokeStyle = 'rgba(255,255,255,0.8)';
-        ec.lineWidth = 3;
-        ec.strokeText(el.label, 0, s*0.6);
-        ec.fillText(el.label, 0, s*0.6);
+        ec.lineWidth = 3 / scale;
+        ec.strokeText(el.label, 0, s * 0.6);
+        ec.fillText(el.label, 0, s * 0.6);
       }
     }
     ec.restore();
   });
-  ec.fillStyle = '#999';
+ 
+  ec.restore();
+ 
+  // Watermark
+  ec.fillStyle = '#bbb';
   ec.font = '13px monospace';
   ec.textAlign = 'right';
-  ec.fillText('PlanAuSol - ' + (document.getElementById('plan-name').value || ''), exp.width - 14, exp.height - 14);
-
+  ec.fillText('PlanAuSol - ' + (document.getElementById('plan-name').value || ''), OUT_W - 14, OUT_H - 14);
+ 
   const link = document.createElement('a');
   link.download = (document.getElementById('plan-name').value || 'plan') + '.png';
   link.href = exp.toDataURL('image/png');
   link.click();
 }
 
-// TOAST
+// Toast
 function showToast(msg) {
   let t = document.getElementById('toast');
   if (!t) {
@@ -812,7 +937,7 @@ function showToast(msg) {
   t._timer = setTimeout(() => t.style.opacity = '0', 2500);
 }
 
-// INIT
+// Init
 loadPlan();
 if (!rooms.length && !elements.length) {
   rooms.push({ id: makeId(), x:-200, y:-150, w:400, h:300, label:'Décor principal', color:'#fafaf7' });
