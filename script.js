@@ -32,7 +32,7 @@ const HANDLE_SIZE = 8; // en pixel - px
 
 // ELEMENT DEFAULTS
 const DEFAULTS = {
-  camera:    { emoji:'📷', label:'Cam', color:'#4a9eff', size:36 },
+  camera:    { emoji:'./images/camera.svg', label:'Cam', color:'#4a9eff', size:36 },
   tripod:    { emoji:'🎬', label:'', color:'#4a9eff', size:36 },
   monitor:   { emoji:'🖥', label:'', color:'#4a9eff', size:36 },
   light:     { emoji:'💡', label:'Lumière', color:'#ffcc44', size:36 },

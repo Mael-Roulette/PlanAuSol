@@ -150,7 +150,7 @@ header {
   padding: 10px 6px;
   border: 1.5px solid var(--border);
   border-radius: var(--r);
-  background: var(--surface2);
+  background: var(--room-bg);
   cursor: grab;
   transition: all 0.15s;
   user-select: none;
@@ -165,9 +165,8 @@ header {
   color: var(--text); 
 }
 
-.element-btn .icon { 
-  font-size: 1.4rem; 
-  line-height: 1; 
+.element-btn .icon {
+  max-width: 60%;
 }
 
 .element-btn[data-type="camera"] .icon { 
