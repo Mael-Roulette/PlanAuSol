@@ -28,6 +28,13 @@ let resizeHandle = null; // 'n','s','e','w','ne','nw','se','sw'
 let resizeStartMouse = null;
 let resizeStartRoom = null;
 
+// Furniture resize state
+let isResizingFurniture = false;
+let resizeFurnitureId = null;
+let resizeFurnitureHandle = null;
+let resizeFurnitureStartMouse = null;
+let resizeFurnitureStart = null;
+
 const HANDLE_SIZE = 8; // en pixel - px
 
 const IMAGE_CACHE = {};
@@ -49,7 +56,7 @@ const DEFAULTS = {
   dome: { img: './images/dome.webp', label: 'Dome', color: '#ffcc44', size: 36 },
   micro: { img: './images/micro.webp', label: 'Micro', color: '#ffcc44', size: 36 },
   person: { img: './images/people.webp', label: 'P1', color: '#ff6b6b', size: 36 },
-  table: { emoji: '', label: 'TABLE', color: '#7bed9f', size: 48, shape: 'rect' },
+  furniture: { emoji: '', label: 'Mobilier', color: '#7bed9f', w: 80, h: 48, shape: 'rect' },
 };
 
 Object.values( DEFAULTS ).forEach( d => {
@@ -111,6 +118,13 @@ function draw () {
   if ( selectedRoomId ) {
     const r = rooms.find( r => r.id === selectedRoomId );
     if ( r ) drawRoomHandles( r );
+  }
+
+  // Draw resize handles in screen space (for selected furniture)
+  // Doit être après ctx.restore() pour être en screen space, comme drawRoomHandles
+  if ( selectedId ) {
+    const el = elements.find( e => e.id === selectedId );
+    if ( el && el.type === 'furniture' ) drawFurnitureHandles( el );
   }
 }
 
@@ -174,7 +188,7 @@ function drawRoom ( r ) {
 }
 
 /**
- * Dessiner les carré pour resize la salle
+ * Dessiner les carrés pour resize la salle
  * @param {*} r salle à resize
  */
 function drawRoomHandles ( r ) {
@@ -192,9 +206,27 @@ function drawRoomHandles ( r ) {
   } );
 }
 
+/**
+ * Dessiner les carrés pour resize le mobilier
+ * @param {*} el mobilier à resize
+ */
+function drawFurnitureHandles ( el ) {
+  const handles = getFurnitureHandlePositions( el );
+  handles.forEach( h => {
+    ctx.save();
+    ctx.fillStyle = '#f5c842';
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.rect( h.sx - HANDLE_SIZE / 2, h.sy - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE );
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  } );
+}
 
 /**
- * Permet de récupère la position des manettes d'une salle
+ * Permet de récupérer la position des manettes d'une salle
  * @param {*} r salle en modification
  * @returns les coordonnées des manettes
  */
@@ -217,7 +249,35 @@ function getRoomHandlePositions ( r ) {
   ];
 }
 
-// Nom des manettes de redimenbsionnement
+/**
+ * Permet de récupérer la position des manettes d'un mobilier
+ * Le mobilier est centré sur el.x/el.y, donc les coins sont à ±w/2 et ±h/2
+ * @param {*} el mobilier en modification
+ * @returns les coordonnées des manettes
+ */
+function getFurnitureHandlePositions ( el ) {
+  const fw = el.w || 80;
+  const fh = el.h || 48;
+  // Coins en world space (le mobilier est dessiné centré sur el.x, el.y)
+  const tl = toScreen( el.x - fw / 2, el.y - fh / 2 );
+  const br = toScreen( el.x + fw / 2, el.y + fh / 2 );
+  const mx = ( tl.x + br.x ) / 2;
+  const my = ( tl.y + br.y ) / 2;
+
+  // Retourne selon les valeurs Nord, Sud, Est, Ouest
+  return [
+    { id: 'nw', sx: tl.x, sy: tl.y },
+    { id: 'n', sx: mx, sy: tl.y },
+    { id: 'ne', sx: br.x, sy: tl.y },
+    { id: 'e', sx: br.x, sy: my },
+    { id: 'se', sx: br.x, sy: br.y },
+    { id: 's', sx: mx, sy: br.y },
+    { id: 'sw', sx: tl.x, sy: br.y },
+    { id: 'w', sx: tl.x, sy: my },
+  ];
+}
+
+// Nom des manettes de redimensionnement
 const HANDLE_CURSORS = {
   n: 'ns-resize', s: 'ns-resize',
   e: 'ew-resize', w: 'ew-resize',
@@ -232,6 +292,21 @@ function hitRoomHandle ( sx, sy ) {
   if ( !r ) return null;
 
   const handles = getRoomHandlePositions( r );
+  const HIT = HANDLE_SIZE + 4;
+
+  for ( const h of handles ) {
+    if ( Math.abs( sx - h.sx ) < HIT / 2 && Math.abs( sy - h.sy ) < HIT / 2 ) return h.id;
+  }
+
+  return null;
+}
+
+function hitFurnitureHandle ( sx, sy ) {
+  if ( !selectedId ) return null;
+  const el = elements.find( e => e.id === selectedId );
+  if ( !el || el.type !== 'furniture' ) return null;
+
+  const handles = getFurnitureHandlePositions( el );
   const HIT = HANDLE_SIZE + 4;
 
   for ( const h of handles ) {
@@ -260,18 +335,28 @@ function drawElement ( el ) {
     ctx.textBaseline = 'middle';
     ctx.fillText( el.label || 'Texte', 0, 0 );
 
-  } else if ( d.shape === 'rect' || el.type === 'table' || el.type === 'wall' ) {
+  } else if ( d.shape === 'rect' || el.type === 'furniture' || el.type === 'wall' ) {
+    const fw = el.w || el.size || 80;
+    const fh = el.h || el.size * 0.6 || 48;
     ctx.fillStyle = el.color || d.color || '#7bed9f';
-    ctx.fillRect( -s / 2, -s * 0.3, s, s * 0.6 );
+    ctx.fillRect( -fw / 2, -fh / 2, fw, fh );
     ctx.strokeStyle = 'rgba(0,0,0,0.3)';
     ctx.lineWidth = 1.5 / zoom;
-    ctx.strokeRect( -s / 2, -s * 0.3, s, s * 0.6 );
+    ctx.strokeRect( -fw / 2, -fh / 2, fw, fh );
     if ( el.label ) {
       ctx.fillStyle = '#fff';
-      ctx.font = `bold ${ Math.max( 8, s * 0.22 ) }px sans-serif`;
+      ctx.font = `bold ${ Math.max( 8, Math.min( fw, fh ) * 0.22 ) }px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText( el.label, 0, 0 );
+    }
+    // Contour de sélection (les poignées sont dessinées depuis draw() en screen space)
+    if ( el.id === selectedId ) {
+      ctx.strokeStyle = '#f5c842';
+      ctx.lineWidth = 2 / zoom;
+      ctx.setLineDash( [ 5 / zoom, 3 / zoom ] );
+      ctx.strokeRect( -fw / 2, -fh / 2, fw, fh );
+      ctx.setLineDash( [] );
     }
 
   } else {
@@ -302,28 +387,28 @@ function drawElement ( el ) {
       ctx.lineWidth = 3 / zoom;
       ctx.fillText( el.label, 0, s * 0.5 + 2 / zoom );
     }
-  }
 
-  // Sélection
-  if ( el.id === selectedId ) {
-    ctx.strokeStyle = '#f5c842';
-    ctx.lineWidth = 2 / zoom;
-    ctx.setLineDash( [ 5 / zoom, 3 / zoom ] );
-    const r = ( el.type === 'text' ? el.size * ( el.label || '' ).length * 0.35 : s * 0.65 );
-    ctx.strokeRect( -r, -r, r * 2, r * 2 );
-    ctx.setLineDash( [] );
-    const hs = 6 / zoom;
-    ctx.fillStyle = '#f5c842';
-    [ [ -r, -r ], [ r, -r ], [ -r, r ], [ r, r ] ].forEach( ( [ hx, hy ] ) => {
-      ctx.fillRect( hx - hs / 2, hy - hs / 2, hs, hs );
-    } );
+    // Sélection
+    if ( el.id === selectedId ) {
+      ctx.strokeStyle = '#f5c842';
+      ctx.lineWidth = 2 / zoom;
+      ctx.setLineDash( [ 5 / zoom, 3 / zoom ] );
+      const r = ( el.type === 'text' ? el.size * ( el.label || '' ).length * 0.35 : s * 0.65 );
+      ctx.strokeRect( -r, -r, r * 2, r * 2 );
+      ctx.setLineDash( [] );
+      const hs = 6 / zoom;
+      ctx.fillStyle = '#f5c842';
+      [ [ -r, -r ], [ r, -r ], [ -r, r ], [ r, r ] ].forEach( ( [ hx, hy ] ) => {
+        ctx.fillRect( hx - hs / 2, hy - hs / 2, hs, hs );
+      } );
+    }
   }
 
   ctx.restore();
 }
 
 /**
- * Permet aux élements de se coller à la grille
+ * Permet aux éléments de se coller à la grille
  */
 function snap ( v, g = 40 ) {
   return Math.round( v / g ) * g;
@@ -335,10 +420,17 @@ function snap ( v, g = 40 ) {
 function hitTest ( wx, wy ) {
   const els = [ ...elements ].reverse();
   for ( const el of els ) {
-    const s = el.size || 36;
-    const r = ( el.type === 'text' ? s * ( el.label || '' ).length * 0.35 : s * 0.65 );
-    const dx = wx - el.x, dy = wy - el.y;
-    if ( Math.abs( dx ) < r + 4 && Math.abs( dy ) < r + 4 ) return el;
+    // Pour le mobilier on utilise ses vraies dimensions w/h
+    if ( el.type === 'furniture' ) {
+      const fw = el.w || 80, fh = el.h || 48;
+      const dx = wx - el.x, dy = wy - el.y;
+      if ( Math.abs( dx ) < fw / 2 + 4 && Math.abs( dy ) < fh / 2 + 4 ) return el;
+    } else {
+      const s = el.size || 36;
+      const r = ( el.type === 'text' ? s * ( el.label || '' ).length * 0.35 : s * 0.65 );
+      const dx = wx - el.x, dy = wy - el.y;
+      if ( Math.abs( dx ) < r + 4 && Math.abs( dy ) < r + 4 ) return el;
+    }
   }
   return null;
 }
@@ -361,6 +453,7 @@ function updateCursor ( e ) {
   if ( spaceDown || isPanning ) { canvas.style.cursor = isPanning ? 'grabbing' : 'grab'; return; }
   if ( tool === 'room' ) { canvas.style.cursor = 'crosshair'; return; }
   if ( isResizingRoom ) { canvas.style.cursor = HANDLE_CURSORS[ resizeHandle ] || 'nwse-resize'; return; }
+  if ( isResizingFurniture ) { canvas.style.cursor = HANDLE_CURSORS[ resizeFurnitureHandle ] || 'nwse-resize'; return; }
   if ( isDragging ) { canvas.style.cursor = 'grabbing'; return; }
 
   const rect = canvas.getBoundingClientRect();
@@ -369,6 +462,9 @@ function updateCursor ( e ) {
 
   const handle = hitRoomHandle( sx, sy );
   if ( handle ) { canvas.style.cursor = HANDLE_CURSORS[ handle ]; return; }
+
+  const fHandle = hitFurnitureHandle( sx, sy );
+  if ( fHandle ) { canvas.style.cursor = HANDLE_CURSORS[ fHandle ]; return; }
 
   const el = hitTest( w.x, w.y );
   if ( el ) { canvas.style.cursor = 'grab'; return; }
@@ -417,6 +513,19 @@ canvas.addEventListener( 'mousedown', e => {
     resizeStartRoom = { ...r };
     saveHistory();
     canvas.style.cursor = HANDLE_CURSORS[ handle ];
+    return;
+  }
+
+  const furnitureHandle = hitFurnitureHandle( sx, sy );
+  if ( furnitureHandle ) {
+    const el = elements.find( e => e.id === selectedId );
+    isResizingFurniture = true;
+    resizeFurnitureHandle = furnitureHandle;
+    resizeFurnitureId = selectedId;
+    resizeFurnitureStartMouse = { x: w.x, y: w.y };
+    resizeFurnitureStart = { x: el.x, y: el.y, w: el.w || 80, h: el.h || 48 };
+    saveHistory();
+    canvas.style.cursor = HANDLE_CURSORS[ furnitureHandle ];
     return;
   }
 
@@ -480,6 +589,15 @@ canvas.addEventListener( 'mousemove', e => {
     return;
   }
 
+  if ( isResizingFurniture ) {
+    const el = elements.find( e => e.id === resizeFurnitureId );
+    if ( el ) {
+      applyFurnitureResize( el, resizeFurnitureHandle, resizeFurnitureStart, resizeFurnitureStartMouse, w );
+      draw();
+    }
+    return;
+  }
+
   if ( isDragging && selectedId ) {
     const el = elements.find( e => e.id === selectedId );
     if ( el ) {
@@ -511,6 +629,12 @@ canvas.addEventListener( 'mouseup', e => {
     isResizingRoom = false;
     resizeHandle = null;
     resizeRoomId = null;
+  }
+
+  if ( isResizingFurniture ) {
+    isResizingFurniture = false;
+    resizeFurnitureHandle = null;
+    resizeFurnitureId = null;
   }
 
   if ( isDragging ) { saveHistory(); }
@@ -561,6 +685,33 @@ function applyRoomResize ( r, handle, start, startMouse, mouse ) {
   r.x = newX; r.y = newY; r.w = newW; r.h = newH;
 }
 
+/**
+ * Applique le redimensionnement d'un mobilier
+ * Le mobilier étant centré sur x/y, on recalcule le centre en fonction du côté tiré
+ */
+function applyFurnitureResize ( el, handle, start, startMouse, mouse ) {
+  const dx = mouse.x - startMouse.x;
+  const dy = mouse.y - startMouse.y;
+  const MIN = 20;
+
+  let newW = start.w, newH = start.h, newX = start.x, newY = start.y;
+
+  if ( handle.includes( 'e' ) ) { newW = Math.max( MIN, snap( start.w + dx ) ); newX = start.x + ( newW - start.w ) / 2; }
+  if ( handle.includes( 's' ) ) { newH = Math.max( MIN, snap( start.h + dy ) ); newY = start.y + ( newH - start.h ) / 2; }
+  if ( handle.includes( 'w' ) ) {
+    const candidate = Math.max( MIN, snap( start.w - dx ) );
+    newX = start.x - ( candidate - start.w ) / 2;
+    newW = candidate;
+  }
+  if ( handle.includes( 'n' ) ) {
+    const candidate = Math.max( MIN, snap( start.h - dy ) );
+    newY = start.y - ( candidate - start.h ) / 2;
+    newH = candidate;
+  }
+
+  el.w = newW; el.h = newH; el.x = newX; el.y = newY;
+}
+
 
 window.addEventListener( 'keydown', e => {
   if ( e.target.tagName === 'INPUT' ) return;
@@ -596,17 +747,27 @@ function addElement ( type, x, y ) {
   saveHistory();
   const d = DEFAULTS[ type ] || {};
   const count = elements.filter( e => e.type === type ).length + 1;
-  const label = d.label ? ( d.label === 'P1' ? 'P' + count : d.label ) : '';
+  let label = d.label ? ( d.label === 'P1' ? 'P' + count : d.label ) : '';
+
+  if ( type === 'furniture' ) {
+    const userLabel = prompt( 'Nom du mobilier (ex: Table, Chaise, Porte…)', 'Table' );
+    if ( userLabel === null ) return;
+    label = userLabel.trim() || 'Mobilier';
+  }
+
   elements.push( {
     id: makeId(),
     type, x, y,
-    label: label,
+    label,
     rotation: 0,
     color: d.color || '#fff',
     size: d.size || 36,
+    w: d.w || 80,
+    h: d.h || 48,
     emoji: d.emoji || '',
     z: elements.length,
   } );
+
   selectedId = elements[ elements.length - 1 ].id;
   selectedRoomId = null;
   updatePropsPanel();
@@ -656,8 +817,8 @@ function zoomOut () {
 
 function resetZoom () {
   zoom = 1;
-  panX = canvas.width / 2;
-  panY = canvas.height / 2;
+  panX = 0;
+  panY = 0;
   updateZoomDisplay();
   draw();
 }
@@ -881,15 +1042,16 @@ function exportPNG () {
       ec.textAlign = 'center';
       ec.textBaseline = 'middle';
       ec.fillText( el.label || 'Texte', 0, 0 );
-    } else if ( d.shape === 'rect' || el.type === 'table' || el.type === 'wall' ) {
+    } else if ( d.shape === 'rect' || el.type === 'furniture' || el.type === 'wall' ) {
+      const fw = el.w || s, fh = el.h || s * 0.6;
       ec.fillStyle = el.color || d.color || '#7bed9f';
-      ec.fillRect( -s / 2, -s * 0.3, s, s * 0.6 );
+      ec.fillRect( -fw / 2, -fh / 2, fw, fh );
       ec.strokeStyle = 'rgba(0,0,0,0.3)';
       ec.lineWidth = 1.5 / scale;
-      ec.strokeRect( -s / 2, -s * 0.3, s, s * 0.6 );
+      ec.strokeRect( -fw / 2, -fh / 2, fw, fh );
       if ( el.label ) {
         ec.fillStyle = '#fff';
-        ec.font = `bold ${ Math.max( 8, s * 0.22 ) }px monospace`;
+        ec.font = `bold ${ Math.max( 8, Math.min( fw, fh ) * 0.22 ) }px monospace`;
         ec.textAlign = 'center';
         ec.textBaseline = 'middle';
         ec.fillText( el.label, 0, 0 );
