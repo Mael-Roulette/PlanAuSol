@@ -656,8 +656,8 @@ function zoomOut () {
 
 function resetZoom () {
   zoom = 1;
-  panX = 0;
-  panY = 0;
+  panX = canvas.width / 2;
+  panY = canvas.height / 2;
   updateZoomDisplay();
   draw();
 }
